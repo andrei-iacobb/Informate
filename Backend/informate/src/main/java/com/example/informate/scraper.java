@@ -15,7 +15,7 @@ import org.jsoup.select.Elements;
 
 public class scraper {
     articles art = new articles();
-    private String pageURL = art.URL;
+
     public PrintWriter pw;
 
     public scraper() {
@@ -26,11 +26,11 @@ public class scraper {
         }
     }
 
-    public void scrapePageForText()throws IOException{
+    public void scrapePageForText(String pageURL)throws IOException{
+        System.out.println("text got called!");
         Document doc = Jsoup.connect(pageURL).get();
         Elements divs = doc.select("[data-component]");
         StringBuilder fullText = new StringBuilder();
-        pw.println("Output taken from " + pageURL);
         for (Element element : divs) {
             fullText.append(element.text()).append(" ");
         }
@@ -40,14 +40,24 @@ public class scraper {
                 pw.append(cleaned + ".\n");
             }
         }
+        pw.flush();
     }
 
-    public void scrapePageForImages()throws IOException{
+    public void scrapePageForImages(String pageURL)throws IOException{
+
+        System.out.println("image got called!");
         Document doc = Jsoup.connect(pageURL).get();
-        Elements images = doc.getElementsByTag("[data-component]");
+        Elements images = doc.getElementsByTag("img");
         Files.createDirectories(Paths.get("SiteImages/"));
+        int counter = 0;
+        for (Element element :images) {
+            if(!element.equals("")){
+                counter ++;
+            }
+            System.out.println(counter);   
+        }
         for (Element element : images){
-            String src = element.absUrl("src");
+            String src = element.absUrl("image");
             if(!src.equals("")){
                 InputStream inputStream = new URL(src).openStream();
                 Files.copy(inputStream, Paths.get("SiteImages/"+ imageNamer() + ".jpg"), StandardCopyOption.REPLACE_EXISTING);
@@ -66,9 +76,12 @@ public class scraper {
         return namer.toString();
     }
 
-    public void scrapeForTitle() throws IOException{
+    public void scrapeForTitle(String pageURL) throws IOException{
+        System.out.println("title got called!");
         Document doc = Jsoup.connect(pageURL).get();
         Elements title = doc.getElementsByTag("h1");
+        pw.println("Output taken from " + pageURL);
         pw.println(title.text());
+        pw.flush();
     }
 }
