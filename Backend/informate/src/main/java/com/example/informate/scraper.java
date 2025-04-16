@@ -54,8 +54,8 @@ public class scraper {
             if(!element.equals("")){
                 counter ++;
             }
-            System.out.println(counter);   
         }
+        System.out.println(counter);   
         for (Element element : images){
             String src = element.absUrl("image");
             if(!src.equals("")){

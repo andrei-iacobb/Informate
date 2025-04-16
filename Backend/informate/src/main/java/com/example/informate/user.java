@@ -14,7 +14,4 @@ public class user {
         this.password = password;
         this.submittedArticles = new ArrayList<>();
     }
-
-    
-
 }
