@@ -4,314 +4,310 @@
  * Project: Informate
  * Author: Andrei
  * 
- * Main application class for the Informate Backend CLI.
- * This class serves as the entry point for the application and manages the user interface,
- * coordinating between different components:
- * - User authentication (via auth class)
- * - Web scraping (via scraper class)
- * - Article processing (via AI class)
- * - Database operations (via articles class)
- * 
- * The application follows a command-line interface pattern where users can:
- * 1. Register/Login to access the system
- * 2. Add new articles by providing URLs
- * 3. View summaries of stored articles
- * 4. Access full article details
+ * Main REST API server for the Informate Backend.
+ * This class serves as the entry point for the web API and manages:
+ * - User authentication endpoints
+ * - Article management endpoints
+ * - Real-time WebSocket updates for article processing
+ * - CORS configuration for frontend integration
  */
 
 package com.example.informate;
 
-import java.io.*;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
+import static spark.Spark.before;
+import static spark.Spark.get;
+import static spark.Spark.options;
+import static spark.Spark.port;
+import static spark.Spark.post;
 
 /**
- * Main application class for the Informate Backend CLI.
- * Handles user interaction, authentication, web scraping, AI processing,
- * and database operations for managing news articles.
+ * Main REST API server class for the Informate Backend.
+ * Provides RESTful endpoints for authentication, article management,
+ * and real-time updates for article processing.
  */
 public class main {
-    // Instantiate necessary service classes
+    // Service instances
     static scraper scrap = new scraper();
     static auth au = new auth();
     static articles art = new articles();
     static AI ai = new AI();
+    static Gson gson = new Gson();
+    
+    // Store for real-time processing updates
+    static Map<String, String> processingStatus = new ConcurrentHashMap<>();
 
     /**
-     * Application entry point. Initializes the system and presents the initial authentication menu.
-     * This method:
-     * 1. Starts the backend CLI interface
-     * 2. Initializes the authentication database
-     * 3. Verifies console availability for secure password input
-     * 4. Presents the initial login/register menu
-     * 5. Handles user choice and directs to appropriate authentication flow
+     * Application entry point. Initializes the REST API server with all endpoints.
+     * Sets up CORS, authentication endpoints, article endpoints, and WebSocket support.
      *
      * @param args Command line arguments (not used in current implementation)
      */
     public static void main(String[] args) {
-        System.out.println("Starting Informate Backend CLI");
+        System.out.println("Starting Informate REST API Server");
         
         // Initialize the authentication database
         au.initialiseDB();
+        
+        // Configure server port
+        port(8080);
+        
+        // Enable CORS for frontend integration
+        enableCORS();
+        
+        // Setup API routes
+        setupAuthRoutes();
+        setupArticleRoutes();
+        
+        // Start server
+        System.out.println("Informate API Server running on http://localhost:8080");
+    }
 
-        // Get console instance for secure password input
-        Console console = System.console();
-        if (console == null) {
-            System.err.println("Error: Couldn't get Console instance. CLI password input requires a console.");
-            System.exit(1);
-        }
-
-        try (Scanner input = new Scanner(System.in)) {
-            System.out.println("Welcome to Informate Backend CLI");
-            System.out.println("1. Login");
-            System.out.println("2. Register");
-            System.out.print("> ");
-            String option = input.next();
-
-            switch (option) {
-                case "1":
-                    handleLogin(input, console);
-                    break;
-                case "2":
-                    handleRegistration(input, console);
-                    break;
-                default:
-                    System.out.println("Invalid option selected. Exiting.");
-                    break;
+    /**
+     * Enables CORS for all routes to allow frontend requests.
+     */
+    private static void enableCORS() {
+        options("/*", (request, response) -> {
+            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
             }
-        }
-    }
 
-    /**
-     * Handles the user login process.
-     * This method:
-     * 1. Prompts for username
-     * 2. Attempts authentication via auth class
-     * 3. Validates the returned token
-     * 4. On successful login, launches the main menu
-     * 5. On failed login, displays appropriate error message
-     *
-     * @param input Scanner instance for reading user input
-     * @param console Console instance for secure password reading
-     */
-    private static void handleLogin(Scanner input, Console console) {
-        System.out.println("Enter username:");
-        input.nextLine();
-        String username = input.nextLine();
-
-        String token = au.login(username);
-
-        if (token != null && au.isTokenValid(token)) {
-            System.out.println("Login successful.");
-            runMainMenu(input);
-        } else {
-            System.out.println("Login failed. Please check username and password.");
-        }
-    }
-
-    /**
-     * Handles new user registration.
-     * This method:
-     * 1. Prompts for desired username
-     * 2. Securely reads password using Console
-     * 3. Registers user details in the authentication database
-     * 4. Provides feedback on registration status
-     *
-     * Security note: Passwords are read securely and immediately cleared from memory
-     *
-     * @param input Scanner instance for reading user input
-     * @param console Console instance for secure password reading
-     */
-    private static void handleRegistration(Scanner input, Console console) {
-        System.out.println("Choose a username:");
-        input.nextLine();
-        String username = input.nextLine();
-
-        System.out.println("Choose a password:");
-        char[] passwordChars = console.readPassword("Password: ");
-        String password = new String(passwordChars);
-        Arrays.fill(passwordChars, ' ');
-
-        au.insertDetails(username, password);
-        System.out.println("Registration complete. You can now login.");
-    }
-
-    /**
-     * Manages the main application menu and user interactions after successful login.
-     * Presents a loop of options for:
-     * 1. Adding new articles (scraping + AI processing)
-     * 2. Viewing all stored article summaries
-     * 3. Accessing full article details by title
-     * 4. Exiting the application
-     *
-     * This method handles the core application flow and coordinates between
-     * different components based on user choices.
-     *
-     * @param input Scanner instance for reading user input
-     */
-    private static void runMainMenu(Scanner input) {
-        boolean running = true;
-        while (running) {
-            System.out.println("\n--- Main Menu ---");
-            System.out.println("1. Add new article (scrape + summarize)");
-            System.out.println("2. View all article summaries");
-            System.out.println("3. View full article by title");
-            System.out.println("4. Exit");
-            System.out.print("> ");
-            String choice = input.next();
-
-            switch (choice) {
-                case "1":
-                    handleNewArticle(input);
-                    break;
-                case "2":
-                    viewAllSummaries();
-                    break;
-                case "3":
-                    viewFullArticle(input);
-                    break;
-                case "4":
-                    System.out.println("Exiting application. Goodbye!");
-                    running = false;
-                    break;
-                default:
-                    System.out.println("Invalid input. Please enter a number between 1 and 4.");
+            String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
+            if (accessControlRequestMethod != null) {
+                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
             }
-        }
-        au.closeConnection();
-        System.exit(0);
+
+            return "OK";
+        });
+
+        before((request, response) -> {
+            response.header("Access-Control-Allow-Origin", "*");
+            response.header("Access-Control-Request-Method", "*");
+            response.header("Access-Control-Allow-Headers", "*");
+            response.type("application/json");
+        });
     }
 
     /**
-     * Processes the addition of a new article.
-     * This method orchestrates the complete article processing pipeline:
-     * 1. Accepts and validates the article URL
-     * 2. Scrapes the article title
-     * 3. Extracts article text content
-     * 4. Downloads relevant images
-     * 5. Stores raw article text
-     * 6. Processes content with AI for summary and keywords
-     * 7. Updates the database with complete article information
-     *
-     * Error handling:
-     * - Validates URL and content at each step
-     * - Provides detailed feedback on progress and errors
-     * - Ensures partial data is saved even if later steps fail
-     *
-     * @param input Scanner instance for reading the article URL
+     * Sets up authentication-related API endpoints.
+     * Includes login, register, and token validation routes.
      */
-    private static void handleNewArticle(Scanner input) {
+    private static void setupAuthRoutes() {
+        // Login endpoint
+        post("/api/auth/login", (req, res) -> {
+            JsonObject loginData = gson.fromJson(req.body(), JsonObject.class);
+            String username = loginData.get("username").getAsString();
+            String password = loginData.get("password").getAsString();
+            
+            // Validate credentials using auth service
+            String token = au.loginWithPassword(username, password);
+            
+            JsonObject response = new JsonObject();
+            if (token != null && au.isTokenValid(token)) {
+                response.addProperty("success", true);
+                response.addProperty("token", token);
+                response.addProperty("message", "Login successful");
+            } else {
+                res.status(401);
+                response.addProperty("success", false);
+                response.addProperty("message", "Invalid credentials");
+            }
+            
+            return gson.toJson(response);
+        });
+
+        // Register endpoint
+        post("/api/auth/register", (req, res) -> {
+            System.out.println("=== REGISTRATION REQUEST ===");
+            System.out.println("Request body: " + req.body());
+            
+            JsonObject registerData = gson.fromJson(req.body(), JsonObject.class);
+            String username = registerData.get("username").getAsString();
+            String password = registerData.get("password").getAsString();
+            
+            System.out.println("Attempting to register user: " + username);
+            System.out.println("Password length: " + password.length());
+            
+            JsonObject response = new JsonObject();
+            try {
+                au.insertDetails(username, password);
+                System.out.println("Registration successful for user: " + username);
+                response.addProperty("success", true);
+                response.addProperty("message", "Registration successful");
+            } catch (Exception e) {
+                System.err.println("Registration failed for user: " + username);
+                System.err.println("Error details: " + e.getMessage());
+                e.printStackTrace();
+                res.status(400);
+                response.addProperty("success", false);
+                response.addProperty("message", "Registration failed: " + e.getMessage());
+            }
+            
+            System.out.println("Response: " + gson.toJson(response));
+            System.out.println("=== END REGISTRATION REQUEST ===");
+            return gson.toJson(response);
+        });
+
+        // Token validation endpoint
+        get("/api/auth/validate", (req, res) -> {
+            String token = req.headers("Authorization");
+            if (token != null && token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+            
+            JsonObject response = new JsonObject();
+            if (au.isTokenValid(token)) {
+                response.addProperty("valid", true);
+                response.addProperty("username", au.getUsernameFromToken(token));
+            } else {
+                response.addProperty("valid", false);
+            }
+            
+            return gson.toJson(response);
+        });
+    }
+
+    /**
+     * Sets up article-related API endpoints.
+     * Includes routes for getting articles, adding new articles, and processing status.
+     */
+    private static void setupArticleRoutes() {
+        // Get all articles
+        get("/api/articles", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            
+            List<Map<String, String>> articles = art.getAllArticles();
+            return gson.toJson(Map.of("articles", articles));
+        });
+
+        // Get specific article by title
+        get("/api/articles/:title", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            
+            String title = req.params(":title");
+            Map<String, String> article = art.getArticleByTitle(title);
+            
+            if (article.isEmpty()) {
+                res.status(404);
+                return gson.toJson(Map.of("error", "Article not found"));
+            }
+            
+            return gson.toJson(article);
+        });
+
+        // Add new article
+        post("/api/articles", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            
+            JsonObject articleData = gson.fromJson(req.body(), JsonObject.class);
+            String url = articleData.get("url").getAsString();
+            
+            // Generate processing ID for real-time updates
+            String processingId = UUID.randomUUID().toString();
+            
+            // Start async processing
+            CompletableFuture.runAsync(() -> processArticleAsync(url, processingId));
+            
+            return gson.toJson(Map.of(
+                "processingId", processingId,
+                "message", "Article processing started"
+            ));
+        });
+
+        // Get processing status
+        get("/api/articles/status/:processingId", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            
+            String processingId = req.params(":processingId");
+            String status = processingStatus.getOrDefault(processingId, "unknown");
+            
+            return gson.toJson(Map.of("status", status));
+        });
+    }
+
+    /**
+     * Processes an article asynchronously and updates the processing status.
+     *
+     * @param url The URL of the article to process
+     * @param processingId The unique ID for tracking processing status
+     */
+    private static void processArticleAsync(String url, String processingId) {
         try {
-            System.out.println("Paste the website URL:");
-            input.nextLine();
-            String url = input.nextLine().trim();
-
-            if (url.isEmpty()) {
-                System.err.println("Error: URL cannot be empty");
-                return;
-            }
-
-            System.out.println("\nScraping website...");
+            processingStatus.put(processingId, "Scraping website...");
             
             // Get the article title
             String title = scrap.scrapeForTitle(url);
             if (title == null || title.trim().isEmpty()) {
-                System.err.println("Error: Could not find article title");
+                processingStatus.put(processingId, "Error: Could not find article title");
                 return;
             }
-            System.out.println("Title: " + title);
-
+            
+            processingStatus.put(processingId, "Extracting content...");
+            
             // Get the article text
             String articleText = scrap.scrapePageForText(url);
             if (articleText == null || articleText.trim().isEmpty()) {
-                System.err.println("Error: Could not extract article text");
+                processingStatus.put(processingId, "Error: Could not extract article text");
                 return;
             }
-            System.out.println("Extracted " + articleText.split("\\s+").length + " words");
-
+            
+            processingStatus.put(processingId, "Processing images...");
+            
             // Get images if available
             List<String> images = scrap.scrapePageForImages(url, title);
-            if (!images.isEmpty()) {
-                System.out.println("Found " + images.size() + " relevant images");
-            }
-
+            
+            processingStatus.put(processingId, "Saving to database...");
+            
             // Save the raw text
-            System.out.println("\nSaving article to database...");
             art.insertRawText(title, articleText);
-
+            
+            processingStatus.put(processingId, "Processing with AI...");
+            
             // Process with AI
-            System.out.println("Processing with AI...");
             AI.processArticle(articleText, title, images);
-
-            System.out.println("\nArticle successfully added and processed!");
-
+            
+            processingStatus.put(processingId, "Complete");
+            
         } catch (Exception e) {
-            System.err.println("\nError processing article: " + e.getMessage());
-            e.printStackTrace();
+            processingStatus.put(processingId, "Error: " + e.getMessage());
         }
     }
 
     /**
-     * Retrieves and displays summaries of all stored articles.
-     * This method:
-     * 1. Queries the database for all stored articles
-     * 2. Formats and displays each article's:
-     *    - Title
-     *    - Summary
-     * 3. Handles empty database case
-     * 4. Provides user-friendly output formatting
-     */
-    private static void viewAllSummaries() {
-        System.out.println("\nRetrieving article summaries...");
-        List<Map<String, String>> allArticles = art.getAllArticles();
-
-        if (allArticles.isEmpty()) {
-            System.out.println("No articles have been saved yet.");
-            return;
-        }
-
-        System.out.println("\n--- Saved Article Summaries ---");
-        for (Map<String, String> article : allArticles) {
-            String title = article.getOrDefault("title", "[No Title]");
-            String summary = article.getOrDefault("summary", "[Summary not available]");
-            System.out.println("\n- " + title + ":");
-            System.out.println("  " + summary);
-        }
-    }
-
-    /**
-     * Retrieves and displays complete information for a specific article.
-     * This method:
-     * 1. Prompts for article title
-     * 2. Queries the database for exact title match
-     * 3. Displays comprehensive article information:
-     *    - Title
-     *    - Summary
-     *    - Keywords
-     *    - Associated images
-     *    - Full raw text
-     * 4. Handles case where article is not found
+     * Extracts the token from the Authorization header.
      *
-     * @param input Scanner instance for reading the article title
+     * @param authHeader The Authorization header value
+     * @return The extracted token or null if invalid format
      */
-    private static void viewFullArticle(Scanner input) {
-        System.out.println("\nEnter the exact title of the article to view:");
-        input.nextLine();
-        String title = input.nextLine();
-
-        System.out.println("Retrieving article details for: " + title);
-        Map<String, String> article = art.getArticleByTitle(title);
-
-        if (article == null || article.isEmpty()) {
-            System.out.println("Article with title '" + title + "' not found.");
-            return;
+    private static String extractToken(String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
         }
-
-        System.out.println("\n--- Full Article Details ---");
-        System.out.println("Title: " + article.getOrDefault("title", "N/A"));
-        System.out.println("\nSummary: " + article.getOrDefault("summary", "[Not processed yet]"));
-        System.out.println("\nKeywords: " + article.getOrDefault("keywords", "[Not processed yet]"));
-        System.out.println("\nImages: " + article.getOrDefault("images", "[None]"));
-        System.out.println("\nRaw Text: " + article.getOrDefault("rawText", "[Not available]"));
-        System.out.println("\n------");
+        return null;
     }
 }

@@ -7,7 +7,6 @@
 
 package com.example.informate;
 
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,16 +19,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Objects;
 import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import opennlp.tools.sentdetect.SentenceDetectorME;
-import opennlp.tools.sentdetect.SentenceModel;
 
 /**
  * Handles interactions with the OpenAI API to process article text.
@@ -54,10 +49,17 @@ public class AI {
 
     /**
      * Your OpenAI API key.
-     * Replace this with your actual API key from https://platform.openai.com/api-keys
-     * Example: "sk-1234567890abcdef1234567890abcdef1234567890abcdef"
+     * This is now loaded from the .env file or system environment variables.
+     * Create a .env file in the project root with: OPENAI_API_KEY=your_api_key_here
      */
-    private static final String API_KEY = "";
+    private static String getApiKey() {
+        String apiKey = EnvLoader.getEnv("OPENAI_API_KEY");
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            System.err.println("OPENAI_API_KEY not found in .env file or environment variables");
+            System.err.println("Please create a .env file in the project root with: OPENAI_API_KEY=your_api_key_here");
+        }
+        return apiKey;
+    }
 
     /**
      * A simple data structure to hold the results returned by the AI processing.
@@ -180,9 +182,9 @@ public class AI {
             throw new IllegalArgumentException("Input text cannot be null");
         }
 
-        if (API_KEY == null || API_KEY.trim().isEmpty()) {
-            logger.error("OpenAI API key is not set. Please add your API key to the API_KEY constant.");
-            throw new IOException("OpenAI API key is not set. Please add your API key to the API_KEY constant.");
+        if (getApiKey() == null || getApiKey().trim().isEmpty()) {
+            logger.error("OpenAI API key is not set. Please add your API key to the .env file.");
+            throw new IOException("OpenAI API key is not set. Please add your API key to the .env file.");
         }
 
         HttpURLConnection conn = null;
@@ -191,7 +193,7 @@ public class AI {
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + API_KEY);
+            conn.setRequestProperty("Authorization", "Bearer " + getApiKey());
             conn.setDoOutput(true);
 
             JSONObject message = new JSONObject();

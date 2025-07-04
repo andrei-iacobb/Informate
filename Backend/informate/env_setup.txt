@@ -1,0 +1,26 @@
+ENVIRONMENT SETUP INSTRUCTIONS
+=================================
+
+To use the OpenAI API features in Informate, you need to create a .env file in this directory.
+
+1. Create a file named ".env" in the Backend/informate directory
+2. Add the following content to the .env file:
+
+# Environment variables for Informate Backend
+OPENAI_API_KEY=your_openai_api_key_here
+
+3. Replace "your_openai_api_key_here" with your actual OpenAI API key
+
+HOW TO GET YOUR OPENAI API KEY:
+- Go to https://platform.openai.com/api-keys
+- Sign in to your OpenAI account
+- Create a new API key
+- Copy the key (it starts with "sk-...")
+
+EXAMPLE .env FILE CONTENT:
+OPENAI_API_KEY=sk-1234567890abcdef1234567890abcdef1234567890abcdef
+
+IMPORTANT NOTES:
+- The .env file should be in the same directory as this file
+- Do not commit the .env file to version control
+- The .env file is automatically loaded when the application starts 

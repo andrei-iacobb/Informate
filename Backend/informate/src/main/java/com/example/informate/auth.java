@@ -70,29 +70,48 @@ public class auth {
      * @param password The plain-text password for the new user.
      */
     public void insertDetails(String username, String password){
+        System.out.println("=== INSERT DETAILS DEBUG ===");
+        System.out.println("Username: " + username);
+        System.out.println("Password provided: " + (password != null && !password.isEmpty()));
+        System.out.println("Database connection: " + (conn != null ? "Connected" : "Not connected"));
+        
         // Use try-with-resources for the PreparedStatement
         // The SQL statement inserts username and the hashed password
         try (PreparedStatement ps = conn.prepareStatement("INSERT INTO user (username, password) VALUES (?, ?) ")){
             ps.setString(1, username); // Set the username parameter
-            ps.setString(2, hashPassword(password)); // Hash the password and set the parameter
+            System.out.println("Hashing password...");
+            String hashedPassword = hashPassword(password);
+            System.out.println("Password hashed successfully");
+            ps.setString(2, hashedPassword); // Hash the password and set the parameter
+            System.out.println("Executing SQL insert...");
             ps.executeUpdate(); // Execute the insert operation
             System.out.println("User '" + username + "' registered successfully.");
         } catch (SQLException e) {
+            System.err.println("SQL Error during registration:");
+            System.err.println("Error Code: " + e.getErrorCode());
+            System.err.println("SQL State: " + e.getSQLState());
+            System.err.println("Error Message: " + e.getMessage());
             // Handle potential SQL errors (e.g., username already exists)
             if (e.getErrorCode() == 19) { // SQLite constraint violation (likely PRIMARY KEY)
                  System.err.println("Error: Username '" + username + "' already exists.");
+                 throw new RuntimeException("Username already exists");
             } else {
                  System.err.println("Error inserting user details: " + e.getMessage());
                  e.printStackTrace();
+                 throw new RuntimeException("Database error during registration: " + e.getMessage());
             }
         } catch (NoSuchAlgorithmException e) {
             // Handle errors during password hashing
             System.err.println("Error hashing password: " + e.getMessage());
             e.printStackTrace();
+            throw new RuntimeException("Password hashing error: " + e.getMessage());
         } catch (Exception e) {
              // Catch any other unexpected exceptions
              System.err.println("An unexpected error occurred during registration: " + e.getMessage());
              e.printStackTrace();
+             throw new RuntimeException("Unexpected error during registration: " + e.getMessage());
+        } finally {
+            System.out.println("=== END INSERT DETAILS DEBUG ===");
         }
     }
 
@@ -159,6 +178,48 @@ public class auth {
         }
     }
 
+    /**
+     * Attempts to log in a user with provided username and password.
+     * This method is used by the REST API where both credentials are provided.
+     * 
+     * @param username The username attempting to log in.
+     * @param password The plain-text password for authentication.
+     * @return A session token string if login is successful, null otherwise.
+     */
+    public String loginWithPassword(String username, String password) {
+        // Check if the username exists in the database
+        try (PreparedStatement ps = conn.prepareStatement("SELECT username FROM user WHERE username = ?")){
+            ps.setString(1, username); // Set the username parameter
+            ResultSet result = ps.executeQuery();
+
+            // If a result is found, the username exists
+            if (result.next()){
+                try {
+                    // Verify the entered password against the stored hash
+                    if(verifyPassword(password, username)){
+                        // Generate a secure session token upon successful verification
+                        return generateSecureToken(username);
+                    }
+                    else{
+                        return null; // Return null if password verification fails
+                    }
+                } catch (Exception e) {
+                    // Handle errors during password verification
+                    System.err.println("Error during password verification: " + e.getMessage());
+                    e.printStackTrace();
+                    return null;
+                }
+            } else {
+                // Username not found in the database
+                return null;
+            }
+        } catch (SQLException e) {
+            // Handle potential database errors during the user lookup
+            System.err.println("Database error during login: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
 
     /**
      * Verifies a given plain-text password against the stored hash for a specific user.
