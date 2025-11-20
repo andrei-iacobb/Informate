@@ -10,16 +10,23 @@ RUN mvn dependency:go-offline -B
 # Copy source code
 COPY src ./src
 
-# Build the application
+# Build the application with Maven Shade Plugin
 RUN mvn clean package -DskipTests
+
+# List the built JARs for debugging
+RUN ls -lh /app/target/*.jar
 
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
-# Copy the built jar from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy the shaded jar specifically (original-* files are the unshaded versions)
+# Maven Shade Plugin replaces the original JAR, so we copy informate-1.0-SNAPSHOT.jar
+COPY --from=build /app/target/informate-1.0-SNAPSHOT.jar app.jar
+
+# Verify the JAR has a manifest
+RUN jar -xf app.jar META-INF/MANIFEST.MF && cat META-INF/MANIFEST.MF && rm -rf META-INF
 
 # Create directories for data persistence
 RUN mkdir -p /app/SiteImages
