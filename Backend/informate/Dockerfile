@@ -25,9 +25,6 @@ WORKDIR /app
 # Maven Shade Plugin replaces the original JAR, so we copy informate-1.0-SNAPSHOT.jar
 COPY --from=build /app/target/informate-1.0-SNAPSHOT.jar app.jar
 
-# Verify the JAR has a manifest
-RUN jar -xf app.jar META-INF/MANIFEST.MF && cat META-INF/MANIFEST.MF && rm -rf META-INF
-
 # Create directories for data persistence
 RUN mkdir -p /app/SiteImages
 
