@@ -13,17 +13,24 @@ COPY src ./src
 # Build the application with Maven Shade Plugin
 RUN mvn clean package -DskipTests
 
-# List the built JARs for debugging
-RUN ls -lh /app/target/*.jar
+# Debug: Show what JARs were created
+RUN echo "=== JARs in target directory ===" && \
+    ls -lh /app/target/*.jar && \
+    echo "=== Checking manifest of informate-1.0-SNAPSHOT.jar ===" && \
+    jar -xf /app/target/informate-1.0-SNAPSHOT.jar META-INF/MANIFEST.MF && \
+    cat META-INF/MANIFEST.MF && \
+    echo "=== End of manifest ===" || echo "Failed to extract manifest"
 
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
-# Copy the shaded jar specifically (original-* files are the unshaded versions)
-# Maven Shade Plugin replaces the original JAR, so we copy informate-1.0-SNAPSHOT.jar
+# Copy the shaded jar specifically
 COPY --from=build /app/target/informate-1.0-SNAPSHOT.jar app.jar
+
+# Verify the JAR was copied
+RUN ls -lh app.jar
 
 # Create directories for data persistence
 RUN mkdir -p /app/SiteImages
