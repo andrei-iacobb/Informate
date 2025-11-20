@@ -31,11 +31,12 @@ services:
       dockerfile: Dockerfile
     container_name: informate-frontend
     ports:
-      - "80:80"
+      - "3001:80"
     depends_on:
       - backend
     networks:
       - informate-network
+      - proxy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
@@ -47,6 +48,8 @@ services:
 networks:
   informate-network:
     driver: bridge
+  proxy:
+    external: true
 
 volumes:
   backend-data:

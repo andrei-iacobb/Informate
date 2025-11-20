@@ -58,19 +58,24 @@ You can run Informate either locally or using Docker. Docker is recommended for 
    cd informate
    ```
 
-2. **Set up environment variables**
+2. **Create the proxy network**
+   ```bash
+   docker network create proxy
+   ```
+
+3. **Set up environment variables**
    ```bash
    cp .env.example .env
    # Edit .env and add your OpenAI API key
    ```
 
-3. **Run with Docker Compose**
+4. **Run with Docker Compose**
    ```bash
    docker-compose up -d
    ```
 
-4. **Access the application**
-   - Frontend: http://localhost
+5. **Access the application**
+   - Frontend: http://localhost:3001
    - Backend API: http://localhost:8080
 
 For detailed Docker documentation, see [DOCKER.md](DOCKER.md)

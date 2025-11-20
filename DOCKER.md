@@ -6,10 +6,19 @@ This guide explains how to run Informate using Docker and Docker Compose.
 
 - Docker (version 20.10 or higher)
 - Docker Compose (version 2.0 or higher)
+- External `proxy` network (see setup below)
 
 ## Quick Start
 
-### 1. Set up environment variables
+### 1. Create the proxy network
+
+The application uses an external Docker network for reverse proxy integration:
+
+```bash
+docker network create proxy
+```
+
+### 2. Set up environment variables
 
 Create a `.env` file in the root directory:
 
@@ -23,7 +32,7 @@ Edit `.env` and add your OpenAI API key:
 OPENAI_API_KEY=sk-your-actual-api-key-here
 ```
 
-### 2. Build and run with Docker Compose
+### 3. Build and run with Docker Compose
 
 ```bash
 # Build and start all services
@@ -39,10 +48,12 @@ docker-compose down
 docker-compose down -v
 ```
 
-### 3. Access the application
+### 4. Access the application
 
-- **Frontend**: http://localhost
+- **Frontend**: http://localhost:3001
 - **Backend API**: http://localhost:8080
+
+**Note**: The frontend is also accessible via your reverse proxy on the `proxy` network.
 
 ## Architecture
 
@@ -58,7 +69,10 @@ The Docker setup consists of two services:
 
 ### Frontend Service
 - **Image**: Nginx Alpine
-- **Port**: 80 (HTTP)
+- **Port**: 3001:80 (host:container)
+- **Networks**:
+  - `informate-network` (internal, for backend communication)
+  - `proxy` (external, for reverse proxy integration)
 - **Features**:
   - Serves React build optimized for production
   - Proxies API requests to backend
@@ -195,6 +209,49 @@ docker-compose up -d --build
 1. Check backend is running: `docker-compose ps`
 2. Check backend health: `curl http://localhost:8080/api/articles`
 3. Check nginx logs: `docker-compose logs frontend`
+
+### Proxy network not found
+
+If you get an error about the `proxy` network not existing:
+
+```bash
+# Create the network
+docker network create proxy
+
+# Restart services
+docker-compose up -d
+```
+
+## Reverse Proxy Integration
+
+The frontend container is connected to an external `proxy` network, making it easy to integrate with reverse proxies like Traefik, Nginx Proxy Manager, or Caddy.
+
+### Example with Traefik
+
+Add labels to the frontend service in `docker-compose.yml`:
+
+```yaml
+frontend:
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.informate.rule=Host(`informate.yourdomain.com`)"
+    - "traefik.http.routers.informate.entrypoints=websecure"
+    - "traefik.http.routers.informate.tls.certresolver=letsencrypt"
+    - "traefik.http.services.informate.loadbalancer.server.port=80"
+    - "traefik.docker.network=proxy"
+```
+
+### Example with Nginx Proxy Manager
+
+1. Create a new proxy host in NPM
+2. Set the destination to `informate-frontend:80`
+3. Enable SSL and configure your domain
+
+### Direct Access
+
+Even with a reverse proxy configured, you can still access the frontend directly:
+- Direct access: http://localhost:3001
+- Via reverse proxy: https://your-domain.com
 
 ## Production Deployment
 
