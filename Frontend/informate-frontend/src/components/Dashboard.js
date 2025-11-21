@@ -174,9 +174,10 @@ const Dashboard = () => {
                 const imageUrl = getArticleImage(article);
 
                 return (
-                  <div
+                  <Link
+                    to={`/article/${index}`}
                     key={index}
-                    className="group bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1"
+                    className="group bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1 block"
                   >
                     {/* Article Image */}
                     {imageUrl && (
@@ -231,7 +232,7 @@ const Dashboard = () => {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

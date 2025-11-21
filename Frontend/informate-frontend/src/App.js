@@ -7,6 +7,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import AddArticle from './components/AddArticle';
+import ArticleView from './components/ArticleView';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -66,6 +67,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AddArticle />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/article/:id"
+              element={
+                <ProtectedRoute>
+                  <ArticleView />
                 </ProtectedRoute>
               }
             />
