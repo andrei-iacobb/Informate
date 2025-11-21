@@ -11,8 +11,8 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      # Persist databases
-      - backend-data:/app
+      # Persist databases (stored in /app/data directory)
+      - backend-data:/app/data
       # Persist images
       - backend-images:/app/SiteImages
     networks:
