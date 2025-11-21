@@ -8,7 +8,7 @@ const Dashboard = () => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { currentUser, logout, API_BASE_URL } = useAuth();
+  const { currentUser, logout, API_BASE_URL, loading: authLoading } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
 
@@ -25,8 +25,10 @@ const Dashboard = () => {
   }, [API_BASE_URL]);
 
   useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
+    if (!authLoading) {
+      fetchArticles();
+    }
+  }, [fetchArticles, authLoading]);
 
   const handleLogout = () => {
     logout();
