@@ -59,7 +59,7 @@ const Dashboard = () => {
     const imageFiles = article.images.split(',').map(img => img.trim()).filter(img => img.length > 0);
     if (imageFiles.length === 0) return null;
     // Use the first image and construct the URL to the backend image server
-    return `http://localhost:8080/SiteImages/${imageFiles[0]}`;
+    return `/SiteImages/${imageFiles[0]}`;
   };
 
   if (loading) {

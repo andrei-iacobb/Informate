@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // API base URL
-  const API_BASE_URL = 'http://localhost:8080/api';
+  const API_BASE_URL = '/api';
 
   // Set up axios defaults
   useEffect(() => {
