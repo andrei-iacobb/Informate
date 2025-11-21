@@ -37,11 +37,10 @@ const ArticleView = () => {
     }
   }, [id, API_BASE_URL, authLoading]);
 
-  const getArticleImage = (article) => {
-    if (!article?.images) return null;
+  const getArticleImages = (article) => {
+    if (!article?.images) return [];
     const imageFiles = article.images.split(',').map(img => img.trim()).filter(img => img.length > 0);
-    if (imageFiles.length === 0) return null;
-    return `/SiteImages/${imageFiles[0]}`;
+    return imageFiles.map(img => `/SiteImages/${img}`);
   };
 
   const parseKeywords = (keywordsString) => {
@@ -66,7 +65,7 @@ const ArticleView = () => {
     );
   }
 
-  const imageUrl = getArticleImage(article);
+  const imageUrls = getArticleImages(article);
   const keywords = parseKeywords(article.keywords);
 
   return (
@@ -89,11 +88,11 @@ const ArticleView = () => {
       {/* Article Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <article className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden`}>
-          {/* Image */}
-          {imageUrl && (
+          {/* Hero Image */}
+          {imageUrls.length > 0 && (
             <div className="aspect-video w-full overflow-hidden">
               <img
-                src={imageUrl}
+                src={imageUrls[0]}
                 alt={article.title || 'Article image'}
                 className="w-full h-full object-cover"
                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -128,6 +127,25 @@ const ArticleView = () => {
                 {article.summary || 'Summary not available yet. The article is still being processed.'}
               </p>
             </div>
+
+            {/* Additional Images Gallery */}
+            {imageUrls.length > 1 && (
+              <div className="mt-8">
+                <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Article Images</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {imageUrls.slice(1).map((imgUrl, idx) => (
+                    <div key={idx} className="aspect-video overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-700">
+                      <img
+                        src={imgUrl}
+                        alt={`Article image ${idx + 2}`}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Original URL */}
             {article.url && (

@@ -254,10 +254,14 @@ public class AI {
 
         return String.format(
             "You are a professional news editor. Your task is to:\n" +
-            "1. Create a concise one-paragraph summary of the following news article\n" +
+            "1. Create a comprehensive 2-3 paragraph summary of the following news article that covers:\n" +
+            "   - The main story and key facts\n" +
+            "   - Important context and background\n" +
+            "   - Significant implications or outcomes\n" +
+            "   Make it detailed and informative while remaining clear and engaging.\n" +
             "2. Extract 5-10 relevant keywords\n\n" +
             "Format your response exactly like this:\n" +
-            "Summary: <your summary here>\n" +
+            "Summary: <your detailed summary here>\n" +
             "Keywords: <comma-separated keywords>\n\n" +
             "Article text:\n%s", text);
     }
