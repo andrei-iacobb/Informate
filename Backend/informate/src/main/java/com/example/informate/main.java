@@ -28,6 +28,7 @@ import static spark.Spark.get;
 import static spark.Spark.options;
 import static spark.Spark.port;
 import static spark.Spark.post;
+import static spark.Spark.staticFiles;
 
 /**
  * Main REST API server class for the Informate Backend.
@@ -53,20 +54,23 @@ public class main {
      */
     public static void main(String[] args) {
         System.out.println("Starting Informate REST API Server");
-        
+
         // Initialize the authentication database
         au.initialiseDB();
-        
+
         // Configure server port
         port(8080);
-        
+
+        // Serve static image files from /app/SiteImages
+        staticFiles.externalLocation("/app/SiteImages");
+
         // Enable CORS for frontend integration
         enableCORS();
-        
+
         // Setup API routes
         setupAuthRoutes();
         setupArticleRoutes();
-        
+
         // Start server
         System.out.println("Informate API Server running on http://localhost:8080");
     }

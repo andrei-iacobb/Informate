@@ -38,7 +38,7 @@ public class scraper {
     private static final Logger logger = LoggerFactory.getLogger(scraper.class);
 
     // Directory to save downloaded images
-    private static final String IMAGE_DIR = "SiteImages/";
+    private static final String IMAGE_DIR = "/app/SiteImages/";
 
     /**
      * Constructor for the scraper.
