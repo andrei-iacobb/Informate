@@ -11,7 +11,11 @@ A full-stack application that scrapes news articles from websites, automatically
 - 👤 **User Authentication**: Secure login and registration system
 - 💾 **Local Storage**: SQLite database for article persistence
 - 🌐 **REST API**: Backend API for frontend integration
-- ⚛️ **React Frontend**: Modern web interface
+- ⚛️ **React Frontend**: Modern, responsive web interface with dark mode
+- 🎨 **Modern UI**: Clean, minimalist design with Tailwind CSS
+- 📱 **Responsive Design**: Optimized for desktop, tablet, and mobile
+- 🌙 **Dark Mode**: System-aware theme with manual toggle
+- 🐳 **Docker Ready**: One-command deployment with Docker Compose
 
 ## Tech Stack
 
@@ -23,21 +27,69 @@ A full-stack application that scrapes news articles from websites, automatically
 - **OpenAI API** for AI summarization
 
 ### Frontend
-- **React** with modern hooks
+- **React 19** with modern hooks
+- **React Router** for navigation
 - **Axios** for API communication
 - **Context API** for state management
-- **CSS3** for styling
+- **Tailwind CSS** for modern styling
+- **Dark mode** support
+
+### Deployment
+- **Docker** & **Docker Compose** for containerization
+- **Nginx** for serving frontend in production
+- **Multi-stage builds** for optimized images
 
 ## Getting Started
 
-### Prerequisites
+You can run Informate either locally or using Docker. Docker is recommended for easier setup and deployment.
+
+### Option 1: Docker (Recommended)
+
+#### Prerequisites
+- Docker 20.10+
+- Docker Compose 2.0+
+- OpenAI API key
+
+#### Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/informate.git
+   cd informate
+   ```
+
+2. **Create the proxy network**
+   ```bash
+   docker network create proxy
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your OpenAI API key
+   ```
+
+4. **Run with Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Access the application**
+   - Frontend: http://localhost:3001
+   - Backend API: http://localhost:8080
+
+For detailed Docker documentation, see [DOCKER.md](DOCKER.md)
+
+### Option 2: Local Installation
+
+#### Prerequisites
 
 - Java Development Kit (JDK) 17 or later
 - Maven 3.6+
 - Node.js 16+ and npm
 - OpenAI API key
 
-### Installation
+#### Installation
 
 1. **Clone the repository**
    ```bash

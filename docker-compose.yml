@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./Backend/informate
+      dockerfile: Dockerfile
+    container_name: informate-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Persist databases (stored in /app/data directory)
+      - backend-data:/app/data
+      # Persist images
+      - backend-images:/app/SiteImages
+    networks:
+      - informate-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/articles"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./Frontend/informate-frontend
+      dockerfile: Dockerfile
+    container_name: informate-frontend
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - informate-network
+      - proxy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  informate-network:
+    driver: bridge
+  proxy:
+    external: true
+
+volumes:
+  backend-data:
+    driver: local
+  backend-images:
+    driver: local

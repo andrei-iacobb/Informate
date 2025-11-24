@@ -38,7 +38,7 @@ public class scraper {
     private static final Logger logger = LoggerFactory.getLogger(scraper.class);
 
     // Directory to save downloaded images
-    private static final String IMAGE_DIR = "SiteImages/";
+    private static final String IMAGE_DIR = "/app/SiteImages/";
 
     /**
      * Constructor for the scraper.
@@ -169,7 +169,7 @@ public class scraper {
      */
     public List<String> scrapePageForImages(String pageURL, String articleTitle) throws IOException {
         logger.debug("Scraping images from URL: {} for article: {}", pageURL, articleTitle);
-        
+
         if (pageURL == null || pageURL.trim().isEmpty()) {
             logger.error("Page URL is null or empty");
             throw new IllegalArgumentException("Page URL cannot be null or empty");
@@ -180,58 +180,91 @@ public class scraper {
         }
 
         // Connect and parse
-        Document doc = Jsoup.connect(pageURL).get();
+        Document doc = Jsoup.connect(pageURL)
+            .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+            .followRedirects(true)
+            .timeout(30000)
+            .get();
 
-        // Select all image elements on the page
-        Elements images = doc.select("img");
         List<String> savedImages = new ArrayList<>();
 
+        // First, try to find images within article content
+        Elements articleImages = doc.select("article img, [role='main'] img, main img, .article__body-content img, .story-body__inner img");
+
+        logger.debug("Found {} images in article content area", articleImages.size());
+
+        // If we found images in the article, use those (more likely to be relevant)
+        Elements targetImages = !articleImages.isEmpty() ? articleImages : doc.select("img");
+
+        logger.debug("Processing {} images for download", targetImages.size());
+
         // Prepare keywords from the article title for relevance check
-        // Filter out short words (<= 3 chars) and convert to lowercase
         String[] titleWords = Arrays.stream(articleTitle.toLowerCase().split("\\s+"))
                 .filter(word -> word.length() > 3)
                 .toArray(String[]::new);
 
-        logger.debug("Found {} images on page. Checking for relevance...", images.size());
+        int savedCount = 0;
+        int maxImages = 8; // Limit to 8 images per article
 
         // Iterate through each found image element
-        for (Element image : images) {
+        for (Element image : targetImages) {
+            if (savedCount >= maxImages) break; // Stop if we have enough images
+
             // Get the absolute source URL of the image
             String src = image.absUrl("src");
-            // Skip if the src attribute is missing or empty
             if (src == null || src.isEmpty()) continue;
 
-            // Get image alt and title attributes for context (convert to lowercase)
+            // Skip small images (likely icons, logos, etc.)
+            try {
+                String width = image.attr("width");
+                String height = image.attr("height");
+                if (!width.isEmpty() && !height.isEmpty()) {
+                    int w = Integer.parseInt(width);
+                    int h = Integer.parseInt(height);
+                    if (w < 200 || h < 150) {
+                        logger.debug("Skipping small image: {}x{}", w, h);
+                        continue; // Skip thumbnails and icons
+                    }
+                }
+            } catch (NumberFormatException e) {
+                // If width/height parsing fails, continue anyway
+            }
+
+            // Skip common non-article images
+            String srcLower = src.toLowerCase();
+            if (srcLower.contains("logo") || srcLower.contains("icon") ||
+                srcLower.contains("avatar") || srcLower.contains("badge")) {
+                continue;
+            }
+
+            // Get image alt and title attributes
             String altText = image.attr("alt").toLowerCase();
             String titleText = image.attr("title").toLowerCase();
             String combinedText = altText + " " + titleText;
 
-            // Check if any significant word from the article title appears in the image alt/title text
-            boolean relevant = Arrays.stream(titleWords)
-                    .anyMatch(combinedText::contains);
+            // For images in article content, be more lenient
+            boolean relevant = !articleImages.isEmpty() ||
+                              Arrays.stream(titleWords).anyMatch(combinedText::contains) ||
+                              !altText.isEmpty(); // Has alt text (likely meaningful)
 
-            // If the image seems relevant based on the text match
             if (relevant) {
-                logger.debug("Found relevant image: {}", src);
-                // Attempt to download and save the image
+                logger.debug("Downloading image: {}", src);
                 try (InputStream input = new URL(src).openStream()) {
-                    // Generate a random filename to avoid collisions
                     String extension = getFileExtension(src);
                     String fileName = generateRandomFileName() + extension;
-                    // Define the full path for saving the image
                     java.nio.file.Path targetPath = Paths.get(IMAGE_DIR + fileName);
-                    // Copy the image data from the input stream to the file
                     Files.copy(input, targetPath, StandardCopyOption.REPLACE_EXISTING);
-                    // Add the filename to the list of saved images
                     savedImages.add(fileName);
-                    logger.debug("Saved image as: {}", fileName);
+                    savedCount++;
+                    logger.debug("Saved image {} as: {}", savedCount, fileName);
                 } catch (IOException e) {
-                    logger.error("Failed to download or save image: {}", src, e);
+                    logger.error("Failed to download image: {}", src, e);
                 }
             }
         }
 
-        logger.info("Downloaded {} relevant images to {}", savedImages.size(), IMAGE_DIR);
+        logger.info("Downloaded {} images to {}", savedImages.size(), IMAGE_DIR);
         return savedImages;
     }
 

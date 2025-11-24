@@ -1,12 +1,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import SplashScreen from './components/SplashScreen';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import AddArticle from './components/AddArticle';
-import './App.css';
+import ArticleView from './components/ArticleView';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -22,60 +23,68 @@ const PublicRoute = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="app-container">
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
           <Routes>
             {/* Public Routes */}
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 <PublicRoute>
                   <SplashScreen />
                 </PublicRoute>
-              } 
+              }
             />
-            <Route 
-              path="/login" 
+            <Route
+              path="/login"
               element={
                 <PublicRoute>
                   <Login />
                 </PublicRoute>
-              } 
+              }
             />
-            <Route 
-              path="/register" 
+            <Route
+              path="/register"
               element={
                 <PublicRoute>
                   <Register />
                 </PublicRoute>
-              } 
+              }
             />
-            
+
             {/* Protected Routes */}
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/add-article" 
+            <Route
+              path="/add-article"
               element={
                 <ProtectedRoute>
                   <AddArticle />
                 </ProtectedRoute>
-              } 
+              }
             />
-            
+            <Route
+              path="/article/:id"
+              element={
+                <ProtectedRoute>
+                  <ArticleView />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Catch all route */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
