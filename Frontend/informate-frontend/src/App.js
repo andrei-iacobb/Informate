@@ -8,6 +8,8 @@ import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import AddArticle from './components/AddArticle';
 import ArticleView from './components/ArticleView';
+import StackList from './components/StackList';
+import StackDetail from './components/StackDetail';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -75,6 +77,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ArticleView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stacks"
+              element={
+                <ProtectedRoute>
+                  <StackList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stack/:id"
+              element={
+                <ProtectedRoute>
+                  <StackDetail />
                 </ProtectedRoute>
               }
             />
