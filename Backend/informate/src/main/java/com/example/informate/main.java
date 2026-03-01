@@ -14,8 +14,13 @@
 
 package com.example.informate;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +49,9 @@ public class main {
     static articles art = new articles();
     static AI ai = new AI();
     static StackService stackService = new StackService();
+    static SearchService searchService = new SearchService();
+    static EmbeddingService embeddingService = new EmbeddingService();
+    static AnalysisService analysisService = new AnalysisService(embeddingService);
     static Gson gson = new Gson();
     
     // Store for real-time processing updates
@@ -338,6 +346,61 @@ public class main {
             return gson.toJson(Map.of("success", true));
         });
 
+        // Suggest stack for an article
+        post("/api/stacks/suggest", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            JsonObject data = gson.fromJson(req.body(), JsonObject.class);
+
+            String keywords = "";
+            if (data.has("articleId")) {
+                Map<String, String> article = art.getArticleById(data.get("articleId").getAsInt());
+                keywords = article.getOrDefault("keywords", "");
+            } else if (data.has("keywords")) {
+                keywords = data.get("keywords").getAsString();
+            }
+
+            if (keywords.isEmpty()) {
+                return gson.toJson(Map.of("existingStacks", List.of(), "suggestedName", "New Stack"));
+            }
+
+            Set<String> articleKeywords = new HashSet<>(
+                Arrays.asList(keywords.toLowerCase().split("\\s*,\\s*")));
+
+            List<Map<String, Object>> allStacks = stackService.getAllStacks();
+            List<Map<String, Object>> matches = new ArrayList<>();
+
+            for (Map<String, Object> stack : allStacks) {
+                String stackKw = (String) stack.get("keywords");
+                if (stackKw == null || stackKw.isEmpty()) continue;
+
+                Set<String> stackKeywords = new HashSet<>(
+                    Arrays.asList(stackKw.toLowerCase().split("\\s*,\\s*")));
+                long overlap = articleKeywords.stream().filter(stackKeywords::contains).count();
+                if (overlap > 0) {
+                    double score = (double) overlap / Math.max(articleKeywords.size(), 1);
+                    Map<String, Object> match = new HashMap<>();
+                    match.put("id", stack.get("id"));
+                    match.put("name", stack.get("name"));
+                    match.put("matchScore", Math.round(score * 100));
+                    matches.add(match);
+                }
+            }
+
+            matches.sort((a, b) -> Long.compare(
+                (long) b.get("matchScore"), (long) a.get("matchScore")));
+
+            String suggestedName = analysisService.suggestStackName(keywords);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("existingStacks", matches);
+            result.put("suggestedName", suggestedName);
+            return gson.toJson(result);
+        });
+
         // Add article to stack
         post("/api/stacks/:id/articles", (req, res) -> {
             String token = extractToken(req.headers("Authorization"));
@@ -364,6 +427,29 @@ public class main {
             int articleId = Integer.parseInt(req.params(":articleId"));
             stackService.removeArticleFromStack(stackId, articleId);
             return gson.toJson(Map.of("success", true));
+        });
+
+        // Trigger analysis pipeline
+        post("/api/stacks/:id/analyze", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int stackId = Integer.parseInt(req.params(":id"));
+            Map<String, Object> stack = stackService.getStack(stackId);
+            if (stack.isEmpty()) {
+                res.status(404);
+                return gson.toJson(Map.of("error", "Stack not found"));
+            }
+
+            String currentStatus = (String) stack.get("status");
+            if ("searching".equals(currentStatus) || "analyzing".equals(currentStatus)) {
+                return gson.toJson(Map.of("message", "Pipeline already running"));
+            }
+
+            CompletableFuture.runAsync(() -> runStackPipeline(stackId));
+            return gson.toJson(Map.of("success", true, "message", "Analysis started"));
         });
 
         // Get stack pipeline status
@@ -428,6 +514,97 @@ public class main {
             
         } catch (Exception e) {
             processingStatus.put(processingId, "Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Runs the full stack analysis pipeline: search, embed, and analyze.
+     *
+     * @param stackId The ID of the stack to process
+     */
+    private static void runStackPipeline(int stackId) {
+        try {
+            stackService.updateStatus(stackId, "searching");
+
+            Map<String, Object> stack = stackService.getStack(stackId);
+            String keywords = (String) stack.get("keywords");
+            String focus = (String) stack.get("focus");
+            int searchDepth = (int) stack.get("searchDepth");
+
+            // Step 1: Search for additional articles via SearXNG
+            if (searchService.isAvailable() && keywords != null && !keywords.isEmpty()) {
+                List<Map<String, String>> searchResults = searchService.search(keywords, searchDepth);
+                for (Map<String, String> result : searchResults) {
+                    try {
+                        String url = result.get("url");
+                        String title = scrap.scrapeForTitle(url);
+                        if (title == null || title.trim().isEmpty()) continue;
+
+                        String text = scrap.scrapePageForText(url);
+                        if (text == null || text.trim().isEmpty()) continue;
+
+                        art.insertRawText(title, text);
+
+                        Map<String, String> saved = art.getArticleByTitle(title);
+                        if (saved.containsKey("id")) {
+                            int articleId = Integer.parseInt(saved.get("id"));
+                            stackService.addArticleToStack(stackId, articleId, "searxng");
+                        }
+
+                        Thread.sleep(1500);
+                    } catch (Exception e) {
+                        System.err.println("Error processing search result: " + e.getMessage());
+                    }
+                }
+            }
+
+            // Step 2: Embed all stack articles
+            stackService.updateStatus(stackId, "analyzing");
+
+            embeddingService.deleteByStackId(stackId);
+
+            List<Map<String, Object>> allArticles = stackService.getStackArticles(stackId);
+            Set<String> allKeywords = new HashSet<>();
+
+            for (Map<String, Object> article : allArticles) {
+                int articleId = (int) article.get("id");
+                String title = (String) article.get("title");
+                String source = (String) article.get("source");
+
+                Map<String, String> fullArticle = art.getArticleById(articleId);
+                String rawText = fullArticle.get("rawText");
+                if (rawText == null || rawText.isEmpty()) continue;
+
+                String artKeywords = fullArticle.get("keywords");
+                if (artKeywords != null) {
+                    Arrays.stream(artKeywords.split(","))
+                        .map(String::trim)
+                        .filter(k -> !k.isEmpty())
+                        .forEach(allKeywords::add);
+                }
+
+                List<String> chunks = embeddingService.chunkText(rawText);
+                embeddingService.storeChunks(stackId, articleId, title, source, chunks);
+            }
+
+            if (!allKeywords.isEmpty()) {
+                stackService.updateKeywords(stackId, String.join(",", allKeywords));
+            }
+
+            // Step 3: Generate analysis
+            stack = stackService.getStack(stackId);
+            keywords = (String) stack.get("keywords");
+            String analysis = analysisService.generateAnalysis(
+                stackId, keywords, focus, allArticles.size());
+
+            if (analysis != null) {
+                stackService.updateAnalysis(stackId, analysis);
+            } else {
+                stackService.updateStatus(stackId, "error");
+            }
+        } catch (Exception e) {
+            System.err.println("Pipeline error for stack " + stackId + ": " + e.getMessage());
+            stackService.updateStatus(stackId, "error");
         }
     }
 
