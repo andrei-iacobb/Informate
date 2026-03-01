@@ -53,30 +53,35 @@ const AddArticle = () => {
     const pollStatus = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/articles/status/${processingId}`);
-        const data = response.data;
+        const statusText = response.data.status || 'Processing...';
 
-        setStatus(data.status || 'Processing...');
-        setProgress(data.progress || 0);
+        setStatus(statusText);
 
-        if (data.completed) {
-          if (data.success) {
-            setSuccess(true);
-            setStatus('Article processed successfully!');
-            setProgress(100);
-          } else {
-            setFailed(true);
-            setStatus(data.error || 'Processing failed');
-          }
+        // Map status text to progress percentage
+        const progressMap = {
+          'Scraping website...': 15,
+          'Extracting content...': 30,
+          'Processing images...': 45,
+          'Saving to database...': 60,
+          'Processing with AI...': 75,
+          'Complete': 100
+        };
+        const newProgress = progressMap[statusText];
+        if (newProgress !== undefined) {
+          setProgress(newProgress);
+        }
+
+        if (statusText === 'Complete') {
+          setSuccess(true);
+        } else if (statusText.startsWith('Error:')) {
+          setFailed(true);
         }
       } catch (err) {
         console.error('Error polling status:', err);
-        // Continue polling even if there's an error
       }
     };
 
     const interval = setInterval(pollStatus, 2000);
-
-    // Clean up interval
     return () => clearInterval(interval);
   }, [processingId, API_BASE_URL]);
 
