@@ -28,6 +28,8 @@ import static spark.Spark.get;
 import static spark.Spark.options;
 import static spark.Spark.port;
 import static spark.Spark.post;
+import static spark.Spark.put;
+import static spark.Spark.delete;
 import static spark.Spark.staticFiles;
 
 /**
@@ -41,6 +43,7 @@ public class main {
     static auth au = new auth();
     static articles art = new articles();
     static AI ai = new AI();
+    static StackService stackService = new StackService();
     static Gson gson = new Gson();
     
     // Store for real-time processing updates
@@ -70,6 +73,7 @@ public class main {
         // Setup API routes
         setupAuthRoutes();
         setupArticleRoutes();
+        setupStackRoutes();
 
         // Start server
         System.out.println("Informate API Server running on http://localhost:8080");
@@ -246,11 +250,136 @@ public class main {
                 res.status(401);
                 return gson.toJson(Map.of("error", "Unauthorized"));
             }
-            
+
             String processingId = req.params(":processingId");
             String status = processingStatus.getOrDefault(processingId, "unknown");
-            
+
             return gson.toJson(Map.of("status", status));
+        });
+    }
+
+    /**
+     * Sets up stack-related API endpoints.
+     * Includes routes for CRUD operations on stacks and stack-article associations.
+     */
+    private static void setupStackRoutes() {
+        // List all stacks
+        get("/api/stacks", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            return gson.toJson(Map.of("stacks", stackService.getAllStacks()));
+        });
+
+        // Create new stack
+        post("/api/stacks", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            JsonObject data = gson.fromJson(req.body(), JsonObject.class);
+            String name = data.get("name").getAsString();
+            String keywords = data.has("keywords") ? data.get("keywords").getAsString() : "";
+            String focus = data.has("focus") && !data.get("focus").isJsonNull() ? data.get("focus").getAsString() : null;
+            int searchDepth = data.has("searchDepth") ? data.get("searchDepth").getAsInt() : 10;
+
+            int id = stackService.createStack(name, keywords, focus, searchDepth);
+            if (id > 0) {
+                return gson.toJson(Map.of("success", true, "id", id));
+            }
+            res.status(500);
+            return gson.toJson(Map.of("error", "Failed to create stack"));
+        });
+
+        // Get stack detail with articles
+        get("/api/stacks/:id", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int id = Integer.parseInt(req.params(":id"));
+            Map<String, Object> stack = stackService.getStack(id);
+            if (stack.isEmpty()) {
+                res.status(404);
+                return gson.toJson(Map.of("error", "Stack not found"));
+            }
+            stack.put("articles", stackService.getStackArticles(id));
+            return gson.toJson(stack);
+        });
+
+        // Update stack
+        put("/api/stacks/:id", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int id = Integer.parseInt(req.params(":id"));
+            JsonObject data = gson.fromJson(req.body(), JsonObject.class);
+            String focus = data.has("focus") && !data.get("focus").isJsonNull() ? data.get("focus").getAsString() : null;
+            int searchDepth = data.has("searchDepth") ? data.get("searchDepth").getAsInt() : 10;
+            stackService.updateStack(id, focus, searchDepth);
+            return gson.toJson(Map.of("success", true));
+        });
+
+        // Delete stack
+        delete("/api/stacks/:id", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int id = Integer.parseInt(req.params(":id"));
+            stackService.deleteStack(id);
+            return gson.toJson(Map.of("success", true));
+        });
+
+        // Add article to stack
+        post("/api/stacks/:id/articles", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int stackId = Integer.parseInt(req.params(":id"));
+            JsonObject data = gson.fromJson(req.body(), JsonObject.class);
+            int articleId = data.get("articleId").getAsInt();
+            String source = data.has("source") ? data.get("source").getAsString() : "manual";
+            stackService.addArticleToStack(stackId, articleId, source);
+            return gson.toJson(Map.of("success", true));
+        });
+
+        // Remove article from stack
+        delete("/api/stacks/:id/articles/:articleId", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int stackId = Integer.parseInt(req.params(":id"));
+            int articleId = Integer.parseInt(req.params(":articleId"));
+            stackService.removeArticleFromStack(stackId, articleId);
+            return gson.toJson(Map.of("success", true));
+        });
+
+        // Get stack pipeline status
+        get("/api/stacks/:id/status", (req, res) -> {
+            String token = extractToken(req.headers("Authorization"));
+            if (!au.isTokenValid(token)) {
+                res.status(401);
+                return gson.toJson(Map.of("error", "Unauthorized"));
+            }
+            int id = Integer.parseInt(req.params(":id"));
+            Map<String, Object> stack = stackService.getStack(id);
+            if (stack.isEmpty()) {
+                res.status(404);
+                return gson.toJson(Map.of("error", "Stack not found"));
+            }
+            return gson.toJson(Map.of("status", stack.get("status")));
         });
     }
 
