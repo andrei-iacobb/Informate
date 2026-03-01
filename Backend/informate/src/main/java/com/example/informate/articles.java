@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manages the storage and retrieval of article data in a SQLite database (`articles.db`).
+ * Manages the storage and retrieval of article data in a PostgreSQL database.
  * Handles operations such as inserting raw article text, updating articles with summaries and keywords,
  * and retrieving article data by title or all articles.
  */
@@ -37,29 +37,31 @@ public class articles {
 
     /**
      * Constructor for the articles class.
-     * Initializes the connection to the SQLite database (`articles.db`).
+     * Initializes the connection to the PostgreSQL database.
      * Creates the `articles` table if it doesn't already exist.
      * Handles potential SQLExceptions during setup.
      */
     public articles() {
         try {
-            // Establish connection to the SQLite database file
-            conn = DriverManager.getConnection("jdbc:sqlite:articles.db");
-            // Use try-with-resources for the Statement to ensure it's closed
+            String dbUrl = EnvLoader.getEnv("DATABASE_URL", "jdbc:postgresql://localhost:5432/informate");
+            String dbUser = EnvLoader.getEnv("POSTGRES_USER", "informate");
+            String dbPassword = EnvLoader.getEnv("POSTGRES_PASSWORD", "");
+
+            conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
             try (Statement stmt = conn.createStatement()) {
-                // SQL command to create the articles table if it doesn't exist
-                // Stores title (primary key), summary, keywords, raw text, and image filenames
                 stmt.execute("""
                     CREATE TABLE IF NOT EXISTS articles (
-                        title TEXT PRIMARY KEY,
+                        id SERIAL PRIMARY KEY,
+                        title TEXT UNIQUE NOT NULL,
                         summary TEXT,
                         keywords TEXT,
-                        rawText TEXT,
-                        images TEXT
+                        raw_text TEXT,
+                        images TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
                     )
                 """);
             }
-            logger.info("Articles database initialized successfully");
+            logger.info("Articles database initialized successfully (PostgreSQL)");
         } catch (SQLException e) {
             logger.error("FATAL: Failed to initialize articles database", e);
             System.exit(1);
@@ -78,7 +80,7 @@ public class articles {
         
         // Use try-with-resources for the PreparedStatement
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT OR IGNORE INTO articles (title, rawText) VALUES (?, ?)")) {
+                "INSERT INTO articles (title, raw_text) VALUES (?, ?) ON CONFLICT (title) DO NOTHING")) {
             ps.setString(1, title); // Set the title parameter
             ps.setString(2, rawText); // Set the raw text parameter
             ps.executeUpdate(); // Execute the insert operation
@@ -139,7 +141,7 @@ public class articles {
                 article.put("title", rs.getString("title"));
                 article.put("summary", rs.getString("summary"));
                 article.put("keywords", rs.getString("keywords"));
-                article.put("rawText", rs.getString("rawText"));
+                article.put("rawText", rs.getString("raw_text"));
                 article.put("images", rs.getString("images"));
                 // Add the article Map to the list
                 articlesList.add(article);
@@ -171,8 +173,9 @@ public class articles {
                     article.put("title", rs.getString("title"));
                     article.put("summary", rs.getString("summary"));
                     article.put("keywords", rs.getString("keywords"));
-                    article.put("rawText", rs.getString("rawText"));
+                    article.put("rawText", rs.getString("raw_text"));
                     article.put("images", rs.getString("images"));
+                    article.put("createdAt", rs.getString("created_at"));
                     logger.info("Retrieved article: {}", title);
                 } else {
                     logger.warn("Article not found: {}", title);
