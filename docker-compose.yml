@@ -14,6 +14,9 @@ services:
       - DATABASE_URL=${DATABASE_URL:-jdbc:postgresql://host.docker.internal:5432/informate}
       - POSTGRES_USER=${POSTGRES_USER:-informate}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-}
+      - QDRANT_URL=${QDRANT_URL:-http://host.docker.internal:6333}
+      - SEARXNG_URL=${SEARXNG_URL:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
     volumes:
       # Persist databases (stored in /app/data directory)
       - backend-data:/app/data

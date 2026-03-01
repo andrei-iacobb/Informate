@@ -138,11 +138,13 @@ public class articles {
                 // Create a Map to hold the current article's data
                 Map<String, String> article = new HashMap<>();
                 // Populate the Map with data from the current row
+                article.put("id", String.valueOf(rs.getInt("id")));
                 article.put("title", rs.getString("title"));
                 article.put("summary", rs.getString("summary"));
                 article.put("keywords", rs.getString("keywords"));
                 article.put("rawText", rs.getString("raw_text"));
                 article.put("images", rs.getString("images"));
+                article.put("createdAt", rs.getString("created_at"));
                 // Add the article Map to the list
                 articlesList.add(article);
             }
@@ -170,6 +172,7 @@ public class articles {
             try (ResultSet rs = ps.executeQuery()) {
                 // If a row is found, populate the Map with the article's data
                 if (rs.next()) {
+                    article.put("id", String.valueOf(rs.getInt("id")));
                     article.put("title", rs.getString("title"));
                     article.put("summary", rs.getString("summary"));
                     article.put("keywords", rs.getString("keywords"));
@@ -183,6 +186,34 @@ public class articles {
             }
         } catch (SQLException e) {
             logger.error("Error retrieving article: {}", title, e);
+        }
+        return article;
+    }
+
+    /**
+     * Retrieves a specific article by its ID.
+     * Returns an empty Map if the article is not found.
+     *
+     * @param id The ID of the article to retrieve.
+     * @return A Map containing the article's data, or an empty Map if not found.
+     */
+    public Map<String, String> getArticleById(int id) {
+        Map<String, String> article = new HashMap<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM articles WHERE id = ?")) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    article.put("id", String.valueOf(rs.getInt("id")));
+                    article.put("title", rs.getString("title"));
+                    article.put("summary", rs.getString("summary"));
+                    article.put("keywords", rs.getString("keywords"));
+                    article.put("rawText", rs.getString("raw_text"));
+                    article.put("images", rs.getString("images"));
+                    article.put("createdAt", rs.getString("created_at"));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error retrieving article by id: {}", id, e);
         }
         return article;
     }
