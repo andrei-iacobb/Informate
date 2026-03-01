@@ -106,6 +106,7 @@ public class AnalysisService {
                 .put("content", prompt);
             JSONObject body = new JSONObject()
                 .put("model", model)
+                .put("stream", false)
                 .put("messages", new JSONArray().put(message));
 
             URL url = new URL(ollamaUrl + "/v1/chat/completions");

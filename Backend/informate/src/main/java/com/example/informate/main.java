@@ -342,6 +342,7 @@ public class main {
                 return gson.toJson(Map.of("error", "Unauthorized"));
             }
             int id = Integer.parseInt(req.params(":id"));
+            embeddingService.deleteByStackId(id);
             stackService.deleteStack(id);
             return gson.toJson(Map.of("success", true));
         });

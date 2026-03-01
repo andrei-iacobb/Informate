@@ -11,7 +11,6 @@ const StackDetail = () => {
   const [focus, setFocus] = useState('');
   const [searchDepth, setSearchDepth] = useState(10);
   const [analyzing, setAnalyzing] = useState(false);
-  const [addArticleId, setAddArticleId] = useState('');
   const [allArticles, setAllArticles] = useState([]);
   const [showAddArticle, setShowAddArticle] = useState(false);
 
@@ -135,7 +134,12 @@ const StackDetail = () => {
     );
   }
 
-  const analysis = stack.analysis ? JSON.parse(stack.analysis) : null;
+  let analysis = null;
+  try {
+    analysis = stack.analysis ? JSON.parse(stack.analysis) : null;
+  } catch (e) {
+    console.error('Failed to parse analysis:', e);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
