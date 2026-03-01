@@ -106,6 +106,15 @@ const ArticleView = () => {
               {article.title || 'Untitled Article'}
             </h1>
 
+            {/* Metadata */}
+            {article.createdAt && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                Added {new Date(article.createdAt).toLocaleDateString('en-GB', {
+                  day: 'numeric', month: 'long', year: 'numeric'
+                })}
+              </p>
+            )}
+
             {/* Keywords */}
             {keywords.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-6">
