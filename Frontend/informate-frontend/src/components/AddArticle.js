@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import axios from 'axios';
+import StackSuggestionModal from './StackSuggestionModal';
 
 const AddArticle = () => {
   const [url, setUrl] = useState('');
@@ -13,6 +14,8 @@ const AddArticle = () => {
   const [progress, setProgress] = useState(0);
   const [success, setSuccess] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [showStackSuggestion, setShowStackSuggestion] = useState(false);
+  const [processedArticleId, setProcessedArticleId] = useState(null);
 
   const { currentUser, logout, API_BASE_URL } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -73,6 +76,16 @@ const AddArticle = () => {
 
         if (statusText === 'Complete') {
           setSuccess(true);
+          // Fetch articles to find the newly added one's ID
+          try {
+            const articlesRes = await axios.get(`${API_BASE_URL}/articles`);
+            const articles = articlesRes.data.articles || [];
+            if (articles.length > 0) {
+              // Most recent article (last in list)
+              const latest = articles[articles.length - 1];
+              if (latest.id) setProcessedArticleId(parseInt(latest.id));
+            }
+          } catch (e) { /* ignore */ }
         } else if (statusText.startsWith('Error:')) {
           setFailed(true);
         }
@@ -274,6 +287,15 @@ const AddArticle = () => {
                     </div>
                   )}
 
+                  {success && processedArticleId && !showStackSuggestion && (
+                    <button
+                      onClick={() => setShowStackSuggestion(true)}
+                      className="mb-4 w-full py-3 px-4 text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800 rounded-lg transition-colors"
+                    >
+                      Add to Analysis Stack
+                    </button>
+                  )}
+
                   <div className="flex gap-4 justify-center">
                     <Link
                       to="/dashboard"
@@ -319,6 +341,13 @@ const AddArticle = () => {
           </ul>
         </div>
       </main>
+
+      {showStackSuggestion && processedArticleId && (
+        <StackSuggestionModal
+          articleId={processedArticleId}
+          onClose={() => setShowStackSuggestion(false)}
+        />
+      )}
     </div>
   );
 };
