@@ -24,7 +24,7 @@ import java.util.Map;
 
 /**
  * Handles user authentication, registration, and secure password management.
- * Stores user credentials in a SQLite database (`data.db`).
+ * Stores user credentials in a PostgreSQL database.
  * Uses SHA-512 hashing with salt for password storage.
  * Manages temporary session tokens in memory.
  */
@@ -38,27 +38,25 @@ public class auth {
     private Map<String, String> tokenStore = new HashMap<>();
 
     /**
-     * Initializes the connection to the SQLite database (`data.db`).
-     * Creates the `user` table if it doesn't already exist.
+     * Initializes the connection to the PostgreSQL database.
+     * Creates the `users` table if it doesn't already exist.
      * Should be called once at application startup.
      */
     public void initialiseDB(){
         try{
-            // Establish connection to the SQLite database file
-            conn = DriverManager.getConnection("jdbc:sqlite:data.db");
-            // Use try-with-resources for the Statement to ensure it's closed
+            String dbUrl = EnvLoader.getEnv("DATABASE_URL", "jdbc:postgresql://localhost:5432/informate");
+            String dbUser = EnvLoader.getEnv("POSTGRES_USER", "informate");
+            String dbPassword = EnvLoader.getEnv("POSTGRES_PASSWORD", "");
+
+            conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
             try (Statement stmt = conn.createStatement()) {
-                // SQL command to create the user table if it doesn't exist
-                // Stores username (primary key) and hashed password
-                stmt.execute("CREATE TABLE IF NOT EXISTS user (username TEXT PRIMARY KEY, password TEXT)");
+                stmt.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT NOT NULL)");
             }
-            System.out.println("Authentication database initialized successfully.");
+            System.out.println("Authentication database initialized successfully (PostgreSQL).");
         } catch (SQLException e){
-            // Log or handle the exception appropriately
             System.err.println("FATAL: Failed to initialize authentication database: " + e.getMessage());
             e.printStackTrace();
-            // Consider exiting the application if the DB connection fails
-             System.exit(1);
+            System.exit(1);
         }
     }
 
@@ -77,7 +75,7 @@ public class auth {
         
         // Use try-with-resources for the PreparedStatement
         // The SQL statement inserts username and the hashed password
-        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO user (username, password) VALUES (?, ?) ")){
+        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO users (username, password) VALUES (?, ?) ")){
             ps.setString(1, username); // Set the username parameter
             System.out.println("Hashing password...");
             String hashedPassword = hashPassword(password);
@@ -127,7 +125,7 @@ public class auth {
      */
     public String login(String username){
         // Check if the username exists in the database
-        try (PreparedStatement ps = conn.prepareStatement("SELECT username FROM user WHERE username = ?")){
+        try (PreparedStatement ps = conn.prepareStatement("SELECT username FROM users WHERE username = ?")){
             ps.setString(1, username); // Set the username parameter
             ResultSet result = ps.executeQuery();
 
@@ -188,7 +186,7 @@ public class auth {
      */
     public String loginWithPassword(String username, String password) {
         // Check if the username exists in the database
-        try (PreparedStatement ps = conn.prepareStatement("SELECT username FROM user WHERE username = ?")){
+        try (PreparedStatement ps = conn.prepareStatement("SELECT username FROM users WHERE username = ?")){
             ps.setString(1, username); // Set the username parameter
             ResultSet result = ps.executeQuery();
 
@@ -236,7 +234,7 @@ public class auth {
         String storedPasswordData = null;
 
         // Retrieve the stored password data (hash:salt) for the given username
-        try(PreparedStatement ps = conn.prepareStatement("SELECT password FROM user WHERE username = ?")) {
+        try(PreparedStatement ps = conn.prepareStatement("SELECT password FROM users WHERE username = ?")) {
             ps.setString(1, username);
             ResultSet result = ps.executeQuery();
             if(result.next()){ // Check if user was found
