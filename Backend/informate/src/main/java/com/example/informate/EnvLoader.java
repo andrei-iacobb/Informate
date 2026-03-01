@@ -60,8 +60,8 @@ public class EnvLoader {
             loaded = true;
             System.out.println("Environment variables loaded from .env file");
         } catch (IOException e) {
-            System.err.println("Could not load .env file: " + e.getMessage());
-            System.err.println("Please create a .env file in the project root with your OpenAI API key");
+            // .env file not found - will fall back to system environment variables
+            loaded = true;
         }
     }
     
