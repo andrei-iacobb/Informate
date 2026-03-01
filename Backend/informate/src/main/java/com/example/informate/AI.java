@@ -27,10 +27,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles interactions with the OpenAI API to process article text.
+ * Handles interactions with a configurable LLM (Ollama) to process article text.
  * This class is responsible for:
  * - Preparing text by cleaning and formatting
- * - Communicating with the OpenAI API for text summarization and keyword extraction
+ * - Communicating with the LLM API for text summarization and keyword extraction
  * - Processing and parsing the API responses
  * - Managing article data storage
  */
@@ -38,27 +38,17 @@ public class AI {
     private static final Logger logger = LoggerFactory.getLogger(AI.class);
 
     /**
-     * The endpoint URL for the OpenAI Chat Completions API.
+     * Returns the LLM API endpoint URL, configurable via OLLAMA_URL env var.
      */
-    private static final String API_URL = "https://api.openai.com/v1/chat/completions";
+    private static String getApiUrl() {
+        return EnvLoader.getEnv("OLLAMA_URL", "http://ollama.ai.svc.cluster.local:11434") + "/v1/chat/completions";
+    }
 
     /**
-     * The specific GPT model to use for text processing.
+     * Returns the LLM model name, configurable via OLLAMA_MODEL env var.
      */
-    private static final String MODEL = "gpt-3.5-turbo";
-
-    /**
-     * Your OpenAI API key.
-     * This is now loaded from the .env file or system environment variables.
-     * Create a .env file in the project root with: OPENAI_API_KEY=your_api_key_here
-     */
-    private static String getApiKey() {
-        String apiKey = EnvLoader.getEnv("OPENAI_API_KEY");
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            System.err.println("OPENAI_API_KEY not found in .env file or environment variables");
-            System.err.println("Please create a .env file in the project root with: OPENAI_API_KEY=your_api_key_here");
-        }
-        return apiKey;
+    private static String getModel() {
+        return EnvLoader.getEnv("OLLAMA_MODEL", "llama3.1:70b");
     }
 
     /**
@@ -73,11 +63,11 @@ public class AI {
     }
 
     /**
-     * Processes a given article text using the OpenAI API.
+     * Processes a given article text using the LLM API.
      * This method performs the following steps:
      * 1. Validates input parameters
      * 2. Prepares text by cleaning and formatting
-     * 3. Calls the OpenAI API with the prepared text
+     * 3. Calls the LLM API with the prepared text
      * 4. Parses the API response to extract summary and keywords
      * 5. Updates the article in the database with the processed data
      *
@@ -105,12 +95,12 @@ public class AI {
             logger.debug("Preparing text for article: {}", title);
             String preparedText = prepareText(articleText);
 
-            logger.debug("Calling OpenAI API for article: {}", title);
-            String apiResponse = callOpenAI(preparedText);
+            logger.debug("Calling LLM API for article: {}", title);
+            String apiResponse = callLLM(preparedText);
 
             if (apiResponse == null) {
-                logger.error("No response received from OpenAI API for article: {}", title);
-                throw new IOException("No response received from OpenAI API");
+                logger.error("No response received from LLM API for article: {}", title);
+                throw new IOException("No response received from LLM API");
             }
 
             logger.debug("Parsing AI response for article: {}", title);
@@ -164,7 +154,7 @@ public class AI {
     }
 
     /**
-     * Calls the OpenAI Chat Completions API with the provided text.
+     * Calls the LLM Chat Completions API with the provided text.
      * This method:
      * 1. Sets up the HTTP connection
      * 2. Constructs the request payload
@@ -175,25 +165,21 @@ public class AI {
      * @throws IllegalArgumentException if inputText is null
      * @throws IOException if there's an error during API communication
      */
-    private static String callOpenAI(String inputText) throws IOException {
-        logger.debug("Calling OpenAI API");
+    private static String callLLM(String inputText) throws IOException {
+        logger.debug("Calling LLM API");
         if (inputText == null) {
             logger.error("Input text is null");
             throw new IllegalArgumentException("Input text cannot be null");
         }
 
-        if (getApiKey() == null || getApiKey().trim().isEmpty()) {
-            logger.error("OpenAI API key is not set. Please add your API key to the .env file.");
-            throw new IOException("OpenAI API key is not set. Please add your API key to the .env file.");
-        }
-
         HttpURLConnection conn = null;
         try {
-            URL url = new URL(API_URL);
+            URL url = new URL(getApiUrl());
             conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(10000);  // 10s connect timeout
+            conn.setReadTimeout(120000);    // 120s read timeout
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + getApiKey());
             conn.setDoOutput(true);
 
             JSONObject message = new JSONObject();
@@ -204,7 +190,7 @@ public class AI {
             messages.put(message);
 
             JSONObject payload = new JSONObject();
-            payload.put("model", MODEL);
+            payload.put("model", getModel());
             payload.put("messages", messages);
 
             try (OutputStream os = conn.getOutputStream()) {
@@ -213,8 +199,8 @@ public class AI {
             }
 
             int status = conn.getResponseCode();
-            logger.debug("OpenAI API response status: {}", status);
-            
+            logger.debug("LLM API response status: {}", status);
+
             InputStream responseStream = (status >= 200 && status < 300)
                     ? conn.getInputStream()
                     : conn.getErrorStream();
@@ -235,7 +221,7 @@ public class AI {
     }
 
     /**
-     * Generates the prompt to be sent to the OpenAI API.
+     * Generates the prompt to be sent to the LLM API.
      * The prompt instructs the AI to:
      * 1. Act as a news editor
      * 2. Summarize the article
@@ -267,7 +253,7 @@ public class AI {
     }
 
     /**
-     * Extracts the main content from the OpenAI API's JSON response.
+     * Extracts the main content from the LLM API's JSON response.
      *
      * @param jsonResponse The JSON response string from the API. Must not be null.
      * @return The content string from the first choice's message, or null if parsing fails.
