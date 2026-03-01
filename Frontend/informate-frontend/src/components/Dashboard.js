@@ -221,6 +221,17 @@ const Dashboard = () => {
                         )}
                       </div>
 
+                      {/* Timestamp */}
+                      {article.createdAt && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                          <span className="text-xs text-slate-500 dark:text-slate-500">
+                            {new Date(article.createdAt).toLocaleDateString('en-GB', {
+                              day: 'numeric', month: 'short', year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Processing Status */}
                       {!article.summary && (
                         <div className="flex items-center gap-2 mt-4 text-amber-600 dark:text-amber-400">
