@@ -114,7 +114,7 @@ const SplashScreen = () => {
               </svg>
             </div>
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Lightning Fast</h3>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">Process articles in seconds with our advanced AI technology</p>
+            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">Process articles locally with self-hosted AI — no API keys needed</p>
           </div>
 
           <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 border border-slate-200 dark:border-slate-700">
