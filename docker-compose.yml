@@ -9,7 +9,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:70b}
+      - DATABASE_URL=${DATABASE_URL:-jdbc:postgresql://host.docker.internal:5432/informate}
+      - POSTGRES_USER=${POSTGRES_USER:-informate}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-}
     volumes:
       # Persist databases (stored in /app/data directory)
       - backend-data:/app/data
